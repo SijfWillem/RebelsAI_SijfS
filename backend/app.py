@@ -6,8 +6,9 @@ import json
 import magic
 from datetime import datetime
 import shutil
-from mistralai.client import MistralClient
-from mistralai.client import ChatMessage
+# from mistralai.client import MistralClient
+# from mistralai.client import ChatMessage
+from mistralai import Mistral
 from dotenv import load_dotenv
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -191,7 +192,7 @@ def classify_document(text: str, file_path: str) -> Dict[str, Any]:
         ]
         
         logger.info(f"Sending text to AI for {file_path}")
-        chat_response = mistral_client.chat(
+        chat_response = mistral_client.chat.complete(
             model="mistral-tiny",
             messages=messages
         )
