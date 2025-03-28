@@ -1,36 +1,35 @@
 # Document Analysis Dashboard
 
-A modern web application for analyzing and managing document collections with advanced classification and metadata extraction capabilities.
+A modern web application for analyzing and managing document collections with AI-powered classification capabilities.
 
 ## Features
 
 - **Document Upload**: Drag-and-drop interface for uploading folders and documents
 - **Document Analysis**: Automatic extraction of metadata and content analysis
-- **Classification**: AI-powered document classification
+- **AI Classification**: Mistral AI-powered document classification
 - **Interactive UI**: Modern, responsive interface with real-time updates
-- **Database Storage**: Persistent storage of document metadata and analysis results
+- **Caching**: Efficient caching of classification results
 - **Folder Structure**: Hierarchical organization with expandable/collapsible folders
 
 ## Tech Stack
 
 - **Backend**: FastAPI (Python)
 - **Frontend**: Flask with TailwindCSS
-- **Database**: PostgreSQL with SQLAlchemy ORM
-- **AI/ML**: OpenAI API for document classification
+- **AI/ML**: Mistral AI API for document classification
 - **File Processing**: python-magic, python-docx, PyPDF2
+- **Caching**: Local file-based caching system
 
 ## Prerequisites
 
 - Python 3.8+
-- PostgreSQL 13+
-- Node.js 14+ (for frontend assets)
+- Mistral AI API key
 
 ## Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/SijfWillem/RebelsAI_Sijf.git
-cd RebelsAI_Sijf
+git clone https://github.com/SijfWillem/RebelsAI_SijfS.git
+cd RebelsAI_SijfS
 ```
 
 2. Create and activate a virtual environment:
@@ -44,128 +43,87 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. Set up the database:
+4. Set up environment variables:
 ```bash
-# Create PostgreSQL database
-createdb document_analysis
-
-# Run database migrations
-alembic upgrade head
-```
-
-5. Set up environment variables:
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-## Configuration
-
-Create a `.env` file with the following variables:
-
-```env
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/document_analysis
-MISTRAL_API_KEY=your_mistral_api_key
+# Create .env file with your Mistral AI API key
+echo "MISTRAL_API_KEY=your_mistral_api_key" > .env
 ```
 
 ## Project Structure
 
 ```
-RebelsAI_Sijf/
-├── app/
-│   ├── models/              # Data models and database schemas
-│   ├── services/            # Business logic and database operations
-│   └── api/                 # API routes and endpoints
+RebelsAI_SijfS/
+├── backend/
+│   ├── app.py              # FastAPI backend server
+│   ├── cache/              # Classification cache
+│   └── uploads/            # Temporary file uploads
 ├── frontend/
 │   ├── app.py              # Flask frontend server
-│   └── templates/          # HTML templates
-├── migrations/             # Database migrations
+│   ├── templates/          # HTML templates
+│   └── temp_uploads/       # Temporary uploads
 ├── requirements.txt        # Python dependencies
 └── README.md              # Project documentation
 ```
 
-## Database Schema
-
-The application uses three main tables:
-
-1. **documents**
-   - Stores document metadata and content
-   - Tracks file information and processing status
-   - Links to parent folders
-
-2. **folders**
-   - Manages folder hierarchy
-   - Stores folder metadata
-   - Supports nested folder structures
-
-3. **classifications**
-   - Stores document classification results
-   - Links to parent documents
-   - Includes confidence scores
-
 ## API Endpoints
 
-- `POST /api/upload-folder`: Upload a folder for analysis
+### Backend (FastAPI)
+
+- `POST /api/analyze-folder`: Upload a folder for analysis
 - `GET /api/folder-insights`: Get comprehensive folder analysis
-- `GET /api/documents`: Get paginated document list
-- `GET /api/documents/{id}`: Get specific document details
-- `DELETE /api/documents/{id}`: Delete a document
+- `GET /api/documents`: Get list of documents in a folder
+
+### Frontend (Flask)
+
+- `GET /`: Main dashboard
+- `POST /api/upload-folder`: Handle folder uploads
+- `GET /api/folder-insights`: Get folder insights
+- `GET /api/documents`: Get document list
+- `GET /health`: Health check endpoint
 
 ## Usage
 
 1. Start the backend server:
 ```bash
-uvicorn app.main:app --reload
+cd backend
+uvicorn app:app --reload --port 8000
 ```
 
 2. Start the frontend server:
 ```bash
-python frontend/app.py
+cd frontend
+python app.py
 ```
 
-3. Open your browser and navigate to `http://localhost:5000`
+3. Open your browser and navigate to `http://localhost:5001`
 
 4. Upload a folder to begin analysis
 
-## Database Management
+## Configuration
 
-### Migrations
+The application can be configured through environment variables:
 
-To create a new migration:
-```bash
-alembic revision --autogenerate -m "description"
-```
-
-To apply migrations:
-```bash
-alembic upgrade head
-```
-
-To rollback migrations:
-```bash
-alembic downgrade -1
-```
-
-### Backup and Restore
-
-To backup the database:
-```bash
-pg_dump -U postgres document_analysis > backup.sql
-```
-
-To restore from backup:
-```bash
-psql -U postgres document_analysis < backup.sql
+```env
+MISTRAL_API_KEY=your_mistral_api_key
+BACKEND_URL=http://localhost:8000  # Optional, defaults to localhost:8000
 ```
 
 ## Error Handling
 
 The application includes comprehensive error handling for:
-- Database connection issues
 - File upload problems
 - Invalid file types
 - Processing errors
 - Network connectivity problems
+- API rate limiting
+- File size limits
+
+## Caching
+
+The application implements a file-based caching system for document classifications to:
+- Reduce API calls to Mistral AI
+- Improve response times
+- Handle rate limiting gracefully
 
 ## Contributing
 
@@ -183,6 +141,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - FastAPI for the backend framework
 - Flask for the frontend server
-- SQLAlchemy for database ORM
-- PostgreSQL for the database
+- Mistral AI for document classification
 - Tailwind CSS for styling

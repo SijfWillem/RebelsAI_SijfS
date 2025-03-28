@@ -5,10 +5,11 @@ import shutil
 import requests
 from werkzeug.utils import secure_filename
 import sys
+from typing import Optional
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     stream=sys.stdout
 )
@@ -17,13 +18,14 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB max file size
 app.config['UPLOAD_FOLDER'] = 'temp_uploads'
+app.config['BACKEND_URL'] = os.getenv('BACKEND_URL', 'http://localhost:8000')
 
 # Ensure upload folder exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 logger.info(f"Created upload folder: {app.config['UPLOAD_FOLDER']}")
 
 # Store the current folder path
-current_folder_path = None
+current_folder_path: Optional[str] = None
 
 def cleanup_upload_folder():
     """Remove all files in the upload folder and recreate the directory."""
@@ -32,9 +34,9 @@ def cleanup_upload_folder():
             shutil.rmtree(app.config['UPLOAD_FOLDER'])
         os.makedirs(app.config['UPLOAD_FOLDER'])
         logger.info("Cleaned up upload folder")
-        logger.info(f"Created upload directory: {app.config['UPLOAD_FOLDER']}")
     except Exception as e:
         logger.error(f"Error cleaning up upload folder: {str(e)}")
+        raise
 
 @app.route('/')
 def index():
@@ -48,12 +50,12 @@ def upload_folder():
     global current_folder_path
     
     try:
-        logger.debug("Received upload request")
+        logger.info("Received upload request")
         if 'files' not in request.files:
             return jsonify({"error": "No files provided"}), 400
         
         files = request.files.getlist('files')
-        logger.debug(f"Files in request: {request.files}")
+        logger.info(f"Processing {len(files)} files")
         
         if not files or files[0].filename == '':
             return jsonify({"error": "No files selected"}), 400
@@ -71,12 +73,12 @@ def upload_folder():
         
         # Store the absolute path of the upload folder
         current_folder_path = os.path.abspath(app.config['UPLOAD_FOLDER'])
-        logger.info(f"Stored folder path (absolute): {current_folder_path}")
+        logger.info(f"Stored folder path: {current_folder_path}")
         
         # Send folder path to backend for analysis
         logger.info("Sending folder path to backend for analysis")
         response = requests.post(
-            'http://localhost:8000/api/analyze-folder',
+            f"{app.config['BACKEND_URL']}/api/analyze-folder",
             params={"folder_path": current_folder_path}
         )
         
@@ -102,7 +104,7 @@ def get_folder_insights():
             
         logger.info(f"Getting insights for folder: {current_folder_path}")
         response = requests.get(
-            'http://localhost:8000/api/folder-insights',
+            f"{app.config['BACKEND_URL']}/api/folder-insights",
             params={"folder_path": current_folder_path}
         )
         
@@ -127,7 +129,7 @@ def get_documents():
             
         logger.info(f"Getting documents for folder: {current_folder_path}")
         response = requests.get(
-            'http://localhost:8000/api/documents',
+            f"{app.config['BACKEND_URL']}/api/documents",
             params={"folder_path": current_folder_path}
         )
         
