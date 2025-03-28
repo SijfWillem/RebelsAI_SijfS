@@ -555,39 +555,48 @@
         // Update classification analysis
         function updateClassificationAnalysis(data) {
             try {
+                // Destroy existing chart if it exists
                 if (classificationChart) {
                     classificationChart.destroy();
                 }
 
-                const ctx = document.getElementById('classificationChart').getContext('2d');
+                // Get the classification distribution data
                 const distribution = data.classification_distribution || {};
-                console.log('Classification distribution:', distribution);
-
+                const metricsContainer = document.getElementById('classification-metrics');
+                
+                // Transform the data for the chart
+                const chartData = {
+                    labels: Object.keys(distribution),
+                    datasets: [{
+                        data: Object.values(distribution),
+                        backgroundColor: generateColors(Object.keys(distribution).length)
+                    }]
+                };
+                
+                // Update classification chart
+                const ctx = document.getElementById('classificationChart').getContext('2d');
                 classificationChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: Object.keys(distribution),
-                        datasets: [{
-                            label: 'Number of Documents',
-                            data: Object.values(distribution),
-                            backgroundColor: [
-                                '#4299e1',
-                                '#48bb78',
-                                '#ed8936',
-                                '#9f7aea',
-                                '#f56565',
-                                '#38b2ac'
-                            ]
-                        }]
-                    },
+                    type: 'pie',
+                    data: chartData,
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: {
-                                    stepSize: 1
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    boxWidth: 12
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.raw || 0;
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = ((value / total) * 100).toFixed(1);
+                                        return `${label}: ${value} (${percentage}%)`;
+                                    }
                                 }
                             }
                         }
@@ -595,20 +604,25 @@
                 });
 
                 // Update classification metrics
-                const metricsContainer = document.getElementById('classification-metrics');
                 if (metricsContainer) {
                     metricsContainer.innerHTML = `
                         <div class="grid grid-cols-2 gap-4">
                             <div class="bg-white p-4 rounded-lg shadow">
                                 <h3 class="text-lg font-semibold mb-2">Most Common Subject</h3>
                                 <p class="text-2xl font-bold text-blue-600">
-                                    ${data.average_classification.category}
+                                    ${data.most_common_classification?.category || 'No subject'}
+                                </p>
+                                <p class="text-sm text-gray-600">
+                                    ${data.most_common_classification?.percentage?.toFixed(1) || 0}% of documents
                                 </p>
                             </div>
                             <div class="bg-white p-4 rounded-lg shadow">
-                                <h3 class="text-lg font-semibold mb-2">Number of Unique Subjects</h3>
+                                <h3 class="text-lg font-semibold mb-2">Classification Confidence</h3>
                                 <p class="text-2xl font-bold text-green-600">
-                                    ${Object.keys(distribution).length}
+                                    ${(data.average_classification_confidence * 100).toFixed(1)}%
+                                </p>
+                                <p class="text-sm text-gray-600">
+                                    Average confidence across all documents
                                 </p>
                             </div>
                         </div>
@@ -617,6 +631,16 @@
             } catch (error) {
                 console.error('Error updating classification analysis:', error);
             }
+        }
+
+        // Add this helper function for generating colors
+        function generateColors(count) {
+            const colors = [
+                '#4299e1', '#48bb78', '#ed8936', '#9f7aea', '#f56565', '#38b2ac',
+                '#805ad5', '#e53e3e', '#2b6cb0', '#2f855a', '#c05621', '#6b46c1',
+                '#e53e3e', '#2b6cb0', '#2f855a', '#c05621', '#6b46c1', '#805ad5'
+            ];
+            return Array(count).fill(0).map((_, i) => colors[i % colors.length]);
         }
 
         // Update folder structure
@@ -713,7 +737,7 @@
             }
 
             container.innerHTML = documents.map(doc => {
-                console.log('Document classification:', doc.classification);
+                const classification = doc.classification || {};
                 return `
                     <div class="metadata-card bg-gray-50 p-4 rounded-lg">
                         <div class="flex justify-between items-start">
@@ -724,14 +748,17 @@
                                 <p class="text-sm text-gray-600">Modified: ${new Date(doc.modified_at).toLocaleDateString()}</p>
                             </div>
                             <div class="text-right">
-                                ${doc.classification ? `
-                                    <div>
-                                        <p class="text-sm font-medium">Subject:</p>
-                                        <span class="text-sm text-blue-600">
-                                            ${doc.classification.category}
+                                <div>
+                                    <p class="text-sm font-medium">Subject:</p>
+                                    <span class="text-sm text-blue-600">
+                                        ${classification.category || 'Not analyzed'}
+                                    </span>
+                                    ${classification.confidence ? `
+                                        <span class="text-xs text-gray-500">
+                                            (${(classification.confidence * 100).toFixed(1)}% confidence)
                                         </span>
-                                    </div>
-                                ` : '<p class="text-sm text-gray-500">Subject: Not analyzed</p>'}
+                                    ` : ''}
+                                </div>
                             </div>
                         </div>
                     </div>

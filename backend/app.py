@@ -57,15 +57,13 @@ CACHE_DIR = Path("cache")
 CACHE_DIR.mkdir(exist_ok=True)
 
 # Classification prompt in English
-CLASSIFICATION_PROMPT = """
-Analyze the following text and determine its main subject or theme.
+CLASSIFICATION_PROMPT = """You are a document classification expert. Analyze the following text and determine its main subject or theme.
 Return only the main subject as a single word or short phrase (maximum 3 words), without any additional text or explanation.
 Focus on the most relevant subject that best describes the document.
 The subject can be in any language that best represents the content.
 
 Text:
-{text}
-"""
+{text}"""
 
 # Create upload directory if it doesn't exist
 UPLOAD_DIR = "uploads"
@@ -186,16 +184,24 @@ def classify_document(text: str, file_path: str) -> Dict[str, Any]:
         return cached_result
     
     try:
-        messages = f"CLASSIFICATION_PROMPT {text}"
+        # Format the prompt with the text
+        formatted_prompt = CLASSIFICATION_PROMPT.format(text=text[:MAX_TEXT_LENGTH])
         
-        logger.info(f"Sending text to AI for {file_path}")
-        chat_response = client.chat.complete(
-            model= model,
-            messages = [
-        {
-            "role": "user",
-            "content": messages,
-        }])
+        logger.info(f"Sending text to Mistral AI for {file_path}")
+        chat_response = mistral_client.chat.complete(
+            model="mistral-large-latest",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a document classification expert. Your task is to analyze text and return only the main subject as a single word or short phrase (max 3 words)."
+                },
+                {
+                    "role": "user",
+                    "content": formatted_prompt
+                }
+            ],
+            temperature=0.3  # Lower temperature for more consistent results
+        )
         
         # Extract the classification from the response
         raw_response = chat_response.choices[0].message.content.strip()
