@@ -7,7 +7,7 @@ import magic
 from datetime import datetime
 import shutil
 from mistralai.client import MistralClient
-from mistralai.models.chat_completion import ChatMessage
+from mistralai.client import ChatMessage
 from dotenv import load_dotenv
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
