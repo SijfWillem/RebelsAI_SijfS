@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Analysis Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <style>
+        .drag-area {
+            border: 2px dashed #4a5568;
+            transition: all 0.3s ease;
+        }
+        .drag-area.active {
+            border-color: #4299e1;
+            background-color: #ebf8ff;
+        }
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .folder-tree {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        .folder-tree ul {
+            list-style: none;
+            padding-left: 1.5rem;
+            margin: 0;
+        }
+        .folder-tree li {
+            margin: 0.25rem 0;
+        }
+        .folder-tree .folder {
+            color: #2b6cb0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            transition: all 0.2s ease;
+        }
+        .folder-tree .folder:hover {
+            background-color: #ebf8ff;
+        }
+        .folder-tree .folder-content {
+            display: none;
+            margin-left: 1.5rem;
+            border-left: 1px solid #e2e8f0;
+            padding-left: 1rem;
+        }
+        .folder-tree .folder-content.expanded {
+            display: block;
+        }
+        .folder-tree .file {
+            color: #4a5568;
+            padding: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-radius: 0.375rem;
+            transition: all 0.2s ease;
+        }
+        .folder-tree .file:hover {
+            background-color: #f7fafc;
+        }
+        .folder-tree .folder-icon {
+            margin-right: 0.5rem;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.5rem;
+            height: 1.5rem;
+        }
+        .folder-tree .folder-icon.expanded {
+            transform: rotate(90deg);
+        }
+        .folder-tree .file-icon {
+            margin-right: 0.5rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.5rem;
+            height: 1.5rem;
+        }
+        .folder-tree .file-info {
+            font-size: 0.875rem;
+            color: #718096;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .folder-tree .folder-name {
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .folder-tree .folder-count {
+            font-size: 0.875rem;
+            color: #718096;
+            background-color: #edf2f7;
+            padding: 0.125rem 0.5rem;
+            border-radius: 9999px;
+        }
+        .folder-tree .file-type {
+            font-size: 0.75rem;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background-color: #edf2f7;
+            padding: 0.125rem 0.5rem;
+            border-radius: 9999px;
+        }
+        .folder-tree .file-size {
+            font-size: 0.875rem;
+            color: #718096;
+        }
+        .folder-tree .file-date {
+            font-size: 0.875rem;
+            color: #718096;
+        }
+        .folder-tree .file-name {
+            font-weight: 500;
+            color: #2d3748;
+        }
+        .folder-tree .file-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .folder-tree .file-details {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .metadata-card {
+            transition: all 0.3s ease;
+        }
+        .metadata-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-4xl font-bold text-gray-800 mb-8 text-center">Document Analysis Dashboard</h1>
+        
+        <!-- Upload Section -->
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-8">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-6">Upload Folder</h2>
+            <form id="uploadForm" class="space-y-6">
+                <div class="drag-area rounded-lg p-8 text-center cursor-pointer" id="dropZone">
+                    <div class="space-y-4">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        <div class="text-gray-600">
+                            <p class="text-lg">Drag and drop your folder here</p>
+                            <p class="text-sm mt-2">or</p>
+                            <button type="button" onclick="document.getElementById('folderInput').click()" 
+                                    class="mt-2 bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                                Browse Files
+                            </button>
+                            <input type="file" id="folderInput" webkitdirectory directory class="hidden">
+                        </div>
+                        <p class="text-sm text-gray-500">Select a folder to analyze its contents</p>
+                    </div>
+                </div>
+                <div id="selectedFolder" class="text-center text-gray-600"></div>
+                <div class="flex justify-center">
+                    <button type="submit" class="bg-green-500 text-white px-8 py-3 rounded-lg hover:bg-green-600 transition-colors font-semibold">
+                        Analyze Folder
+                    </button>
+                </div>
+            </form>
+            <div id="uploadStatus" class="mt-4 text-center text-sm"></div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="hidden">
+            <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div class="bg-white rounded-lg p-8 flex flex-col items-center space-y-4">
+                    <div class="loading-spinner h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+                    <span class="text-gray-700 font-semibold">Processing your folder...</span>
+                    <div class="w-64 bg-gray-200 rounded-full h-2.5">
+                        <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <span id="progressText" class="text-sm text-gray-600">0%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-8">
+            <span class="block sm:inline" id="errorText"></span>
+        </div>
+
+        <!-- Content Sections -->
+        <div id="contentSections" class="hidden space-y-8">
+            <!-- Basic Stats -->
+            <div class="bg-white rounded-lg shadow-lg p-8">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-6">Basic Statistics</h2>
+                <div id="basicStats" class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="bg-blue-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold text-blue-800">Total Documents</h3>
+                        <p id="total-documents" class="text-3xl font-bold text-blue-600">-</p>
+                    </div>
+                    <div class="bg-green-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold text-green-800">Total Size</h3>
+                        <p id="total-size" class="text-3xl font-bold text-green-600">-</p>
+                    </div>
+                    <div class="bg-purple-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold text-purple-800">Average File Size</h3>
+                        <p id="average-size" class="text-3xl font-bold text-purple-600">-</p>
+                    </div>
+                    <div class="bg-yellow-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold text-yellow-800">Last Modified</h3>
+                        <p id="last-modified" class="text-3xl font-bold text-yellow-600">-</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Document Types -->
+            <div class="bg-white rounded-lg shadow-lg p-8">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-6">Document Types</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Type Distribution</h3>
+                        <div class="h-96">
+                            <canvas id="documentTypesChart"></canvas>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">File Sizes</h3>
+                        <div class="h-96">
+                            <canvas id="documentSizeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Classification Analysis -->
+            <div class="bg-white rounded-lg shadow-lg p-8">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-6">Document Classifications</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Subject Distribution</h3>
+                        <div class="h-96">
+                            <canvas id="classificationChart"></canvas>
+                        </div>
+                    </div>
+                    <div id="classification-metrics" class="space-y-4">
+                        <!-- Classification metrics will be inserted here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Document List -->
+            <div class="bg-white rounded-lg shadow-lg p-8">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-6">Documents</h2>
+                <div class="mb-4 flex justify-between items-center">
+                    <div class="flex space-x-4">
+                        <button id="prevPage" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">Previous</button>
+                        <button id="nextPage" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">Next</button>
+                    </div>
+                    <div class="text-gray-600">
+                        Page <span id="currentPage">1</span> of <span id="totalPages">1</span>
+                    </div>
+                </div>
+                <div id="document-list" class="space-y-4 max-h-96 overflow-y-auto"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let documentTypesChart = null;
+        let documentSizeChart = null;
+        let classificationChart = null;
+        let currentPage = 1;
+        const pageSize = 50;
+        let currentFolderPath = null;
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            const errorText = document.getElementById('errorText');
+            errorDiv.classList.remove('hidden');
+            errorText.textContent = message;
+        }
+
+        // Hide error message
+        function hideError() {
+            document.getElementById('errorMessage').classList.add('hidden');
+        }
+
+        // Show loading state
+        function showLoading() {
+            document.getElementById('loadingState').classList.remove('hidden');
+        }
+
+        // Hide loading state
+        function hideLoading() {
+            document.getElementById('loadingState').classList.add('hidden');
+        }
+
+        // Handle drag and drop
+        const dropZone = document.getElementById('dropZone');
+        const folderInput = document.getElementById('folderInput');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropZone.classList.add('active');
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove('active');
+        }
+
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            folderInput.files = files;
+            handleFiles(files);
+        }
+
+        // Handle folder selection
+        folderInput.addEventListener('change', function(e) {
+            handleFiles(e.target.files);
+        });
+
+        function handleFiles(files) {
+            if (!files.length) {
+                showError('Please select a folder');
+                return;
+            }
+
+            const folderName = files[0].webkitRelativePath.split('/')[0];
+            document.getElementById('selectedFolder').textContent = `Selected folder: ${folderName}`;
+        }
+
+        // Handle form submission
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await uploadFolder();
+        });
+
+        // Upload folder to backend
+        async function uploadFolder() {
+            const files = folderInput.files;
+            
+            if (!files.length) {
+                showError('Please select files to upload');
+                return;
+            }
+
+            const formData = new FormData();
+            for (let file of files) {
+                formData.append('files', file);
+            }
+
+            try {
+                showLoading();
+                const progressBar = document.getElementById('progressBar');
+                const progressText = document.getElementById('progressText');
+                let progress = 0;
+
+                // Start progress simulation
+                const progressInterval = setInterval(() => {
+                    if (progress < 90) { // Cap at 90% until actual completion
+                        progress += Math.random() * 10;
+                        progress = Math.min(progress, 90);
+                        progressBar.style.width = `${progress}%`;
+                        progressText.textContent = `${Math.round(progress)}%`;
+                    }
+                }, 500);
+
+                const response = await fetch('/api/upload-folder', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to upload folder');
+                }
+
+                const data = await response.json();
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // Complete progress bar
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+                progressText.textContent = '100%';
+
+                // Store the folder path
+                currentFolderPath = data.folder_path;
+                
+                // Update UI with the analysis results
+                updateUI(data);
+                
+                // Show content sections
+                const contentSections = document.getElementById('contentSections');
+                if (contentSections) {
+                    contentSections.classList.remove('hidden');
+                }
+
+                // Hide loading state after a short delay
+                setTimeout(() => {
+                    hideLoading();
+                }, 500);
+
+            } catch (error) {
+                console.error('Error uploading folder:', error);
+                showError(error.message);
+                hideLoading();
+            }
+        }
+
+        // Fetch data from the backend
+        async function fetchData() {
+            try {
+                const [insightsResponse, documentsResponse] = await Promise.all([
+                    fetch('/api/folder-insights'),
+                    fetch('/api/documents')
+                ]);
+
+                if (!insightsResponse.ok || !documentsResponse.ok) {
+                    throw new Error('Failed to fetch data');
+                }
+
+                const insightsData = await insightsResponse.json();
+                const documentsData = await documentsResponse.json();
+
+                if (insightsData.error) {
+                    throw new Error(insightsData.error);
+                }
+
+                if (documentsData.error) {
+                    throw new Error(documentsData.error);
+                }
+
+                // Update UI with the combined data
+                updateUI({
+                    ...insightsData,
+                    documents: documentsData.documents
+                });
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                showError(error.message);
+            }
+        }
+
+        // Update basic statistics
+        function updateBasicStats(stats) {
+            document.getElementById('total-documents').textContent = stats.total_documents;
+            document.getElementById('total-size').textContent = formatFileSize(stats.total_size);
+            document.getElementById('average-size').textContent = formatFileSize(stats.average_file_size);
+            document.getElementById('last-modified').textContent = new Date(stats.last_modified).toLocaleString();
+        }
+
+        // Update document types chart
+        function updateDocumentTypesChart(types) {
+            if (documentTypesChart) {
+                documentTypesChart.destroy();
+            }
+
+            const ctx = document.getElementById('documentTypesChart').getContext('2d');
+            documentTypesChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(types),
+                    datasets: [{
+                        data: Object.values(types),
+                        backgroundColor: [
+                            '#4299e1',
+                            '#48bb78',
+                            '#ed8936',
+                            '#9f7aea',
+                            '#f56565',
+                            '#38b2ac'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update document size chart
+        function updateDocumentSizeChart(documents) {
+            if (documentSizeChart) {
+                documentSizeChart.destroy();
+            }
+
+            const ctx = document.getElementById('documentSizeChart').getContext('2d');
+            const sizes = documents.map(doc => doc.size);
+            const labels = documents.map(doc => doc.filename);
+
+            documentSizeChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'File Size (bytes)',
+                        data: sizes,
+                        backgroundColor: '#4299e1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update classification analysis
+        function updateClassificationAnalysis(data) {
+            try {
+                if (classificationChart) {
+                    classificationChart.destroy();
+                }
+
+                const ctx = document.getElementById('classificationChart').getContext('2d');
+                const distribution = data.classification_distribution || {};
+                console.log('Classification distribution:', distribution);
+
+                classificationChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(distribution),
+                        datasets: [{
+                            label: 'Number of Documents',
+                            data: Object.values(distribution),
+                            backgroundColor: [
+                                '#4299e1',
+                                '#48bb78',
+                                '#ed8936',
+                                '#9f7aea',
+                                '#f56565',
+                                '#38b2ac'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    stepSize: 1
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Update classification metrics
+                const metricsContainer = document.getElementById('classification-metrics');
+                if (metricsContainer) {
+                    metricsContainer.innerHTML = `
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-2">Most Common Subject</h3>
+                                <p class="text-2xl font-bold text-blue-600">
+                                    ${data.average_classification.category}
+                                </p>
+                            </div>
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-2">Number of Unique Subjects</h3>
+                                <p class="text-2xl font-bold text-green-600">
+                                    ${Object.keys(distribution).length}
+                                </p>
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error updating classification analysis:', error);
+            }
+        }
+
+        // Update folder structure
+        function updateFolderStructure(structure) {
+            try {
+                console.log('Updating folder structure with:', structure);
+                const folderStructure = document.getElementById('folder-structure');
+                if (!folderStructure) {
+                    console.error('Folder structure element not found');
+                    return;
+                }
+
+                function renderFolder(folder, level = 0) {
+                    const folderId = `folder-${Math.random().toString(36).substr(2, 9)}`;
+                    const totalFiles = folder.files.length + folder.subfolders.reduce((acc, sub) => acc + sub.files.length, 0);
+                    
+                    return `
+                        <div class="folder-tree">
+                            <div class="folder" onclick="toggleFolder('${folderId}')">
+                                <span class="folder-icon">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                    </svg>
+                                </span>
+                                <span class="folder-name">
+                                    ${folder.name}
+                                    <span class="folder-count">${totalFiles} items</span>
+                                </span>
+                            </div>
+                            <div id="${folderId}" class="folder-content">
+                                ${folder.files.map(file => `
+                                    <div class="file">
+                                        <div class="file-row">
+                                            <span class="file-icon">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                                </svg>
+                                            </span>
+                                            <span class="file-name">${file.name}</span>
+                                        </div>
+                                        <div class="file-details">
+                                            <span class="file-type">${file.type}</span>
+                                            <span class="file-size">${formatFileSize(file.size)}</span>
+                                            <span class="file-date">${new Date(file.modified).toLocaleString()}</span>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                                ${folder.subfolders.map(subfolder => renderFolder(subfolder, level + 1)).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                folderStructure.innerHTML = renderFolder(structure);
+                console.log('Folder structure rendered successfully');
+            } catch (error) {
+                console.error('Error updating folder structure:', error);
+            }
+        }
+
+        // Add toggle function for folders
+        function toggleFolder(folderId) {
+            const folderContent = document.getElementById(folderId);
+            const folderIcon = folderContent.previousElementSibling.querySelector('.folder-icon');
+            
+            folderContent.classList.toggle('expanded');
+            folderIcon.classList.toggle('expanded');
+        }
+
+        // Add expand all functionality
+        document.getElementById('expandAll').addEventListener('click', () => {
+            const allFolderContents = document.querySelectorAll('.folder-content');
+            const allFolderIcons = document.querySelectorAll('.folder-icon');
+            
+            allFolderContents.forEach(content => content.classList.add('expanded'));
+            allFolderIcons.forEach(icon => icon.classList.add('expanded'));
+        });
+
+        // Add collapse all functionality
+        document.getElementById('collapseAll').addEventListener('click', () => {
+            const allFolderContents = document.querySelectorAll('.folder-content');
+            const allFolderIcons = document.querySelectorAll('.folder-icon');
+            
+            allFolderContents.forEach(content => content.classList.remove('expanded'));
+            allFolderIcons.forEach(icon => icon.classList.remove('expanded'));
+        });
+
+        // Update document list
+        function updateDocumentList(documents) {
+            const container = document.getElementById('document-list');
+            if (!documents || documents.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center">No documents found</p>';
+                return;
+            }
+
+            container.innerHTML = documents.map(doc => {
+                console.log('Document classification:', doc.classification);
+                return `
+                    <div class="metadata-card bg-gray-50 p-4 rounded-lg">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="font-semibold text-gray-800">${doc.filename}</h3>
+                                <p class="text-sm text-gray-600">Type: ${doc.file_type}</p>
+                                <p class="text-sm text-gray-600">Size: ${formatFileSize(doc.size)}</p>
+                                <p class="text-sm text-gray-600">Modified: ${new Date(doc.modified_at).toLocaleDateString()}</p>
+                            </div>
+                            <div class="text-right">
+                                ${doc.classification ? `
+                                    <div>
+                                        <p class="text-sm font-medium">Subject:</p>
+                                        <span class="text-sm text-blue-600">
+                                            ${doc.classification.category}
+                                        </span>
+                                    </div>
+                                ` : '<p class="text-sm text-gray-500">Subject: Not analyzed</p>'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Utility function to format bytes
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Handle pagination
+        document.getElementById('prevPage').addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                fetchData();
+            }
+        });
+
+        document.getElementById('nextPage').addEventListener('click', () => {
+            currentPage++;
+            fetchData();
+        });
+
+        function updateUI(data) {
+            try {
+                console.log('Received data:', data);
+                
+                // Update basic statistics
+                document.getElementById('total-documents').textContent = data.total_documents;
+                document.getElementById('total-size').textContent = formatFileSize(data.total_size);
+                document.getElementById('average-size').textContent = formatFileSize(data.average_file_size);
+                document.getElementById('last-modified').textContent = new Date(data.last_modified).toLocaleString();
+
+                // Update document types chart
+                if (data.document_types) {
+                    updateDocumentTypesChart(data.document_types);
+                }
+
+                // Update document size chart
+                if (data.documents) {
+                    updateDocumentSizeChart(data.documents);
+                }
+
+                // Update classification analysis
+                updateClassificationAnalysis(data);
+
+                // Update folder structure
+                console.log('Folder structure data:', data.folder_structure);
+                if (data.folder_structure) {
+                    updateFolderStructure(data.folder_structure);
+                } else {
+                    console.error('No folder structure data received');
+                }
+
+                // Update document list
+                updateDocumentList(data.documents);
+            } catch (error) {
+                console.error('Error updating UI:', error);
+                showError('Error updating the dashboard');
+            }
+        }
+    </script>
+</body>
+</html> 
