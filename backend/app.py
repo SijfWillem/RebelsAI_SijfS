@@ -263,6 +263,7 @@ async def analyze_folder(folder_path: str):
         total_size = 0
         document_types = {}
         classification_distribution = {}
+        last_modified = None
         
         # Collect all files first
         files_to_process = []
@@ -286,15 +287,53 @@ async def analyze_folder(folder_path: str):
             total_size += doc["size"]
             document_types[doc["file_type"]] = document_types.get(doc["file_type"], 0) + 1
             
+            # Update last modified date
+            doc_modified = datetime.fromisoformat(doc["modified_at"])
+            if last_modified is None or doc_modified > last_modified:
+                last_modified = doc_modified
+            
             if doc["classification"]:
                 category = doc["classification"]["category"]
                 classification_distribution[category] = classification_distribution.get(category, 0) + 1
         
+        # Calculate basic statistics
+        total_files = len(documents)
+        avg_size = total_size / total_files if total_files > 0 else 0
+        
+        # Calculate most common classification
+        if classification_distribution:
+            max_category = max(classification_distribution.items(), key=lambda x: x[1])
+            most_common_classification = {
+                "category": max_category[0],
+                "count": max_category[1],
+                "percentage": (max_category[1] / total_files) * 100
+            }
+        else:
+            most_common_classification = {
+                "category": "No subject",
+                "count": 0,
+                "percentage": 0
+            }
+        
+        # Calculate average classification confidence
+        total_confidence = 0
+        classified_docs = 0
+        for doc in documents:
+            if doc.get("classification"):
+                total_confidence += doc["classification"].get("confidence", 0.5)
+                classified_docs += 1
+        
+        avg_confidence = total_confidence / classified_docs if classified_docs > 0 else 0
+        
         return {
-            "total_files": len(documents),
+            "total_documents": total_files,
             "total_size": total_size,
+            "average_file_size": avg_size,
+            "last_modified": last_modified.isoformat() if last_modified else None,
             "document_types": document_types,
             "classification_distribution": classification_distribution,
+            "most_common_classification": most_common_classification,
+            "average_classification_confidence": avg_confidence,
             "documents": documents
         }
         
@@ -309,15 +348,43 @@ async def get_folder_insights(folder_path: str):
         if not os.path.exists(folder_path):
             raise HTTPException(status_code=404, detail="Folder not found")
             
-        # Reuse the analyze_folder endpoint for insights
+        # Get full analysis
         analysis = await analyze_folder(folder_path)
+        
+        # Calculate additional insights
+        total_files = analysis["total_documents"]
+        total_size = analysis["total_size"]
+        document_types = analysis["document_types"]
+        classification_distribution = analysis["classification_distribution"]
+        
+        # Calculate file type distribution
+        file_type_distribution = {
+            file_type: {
+                "count": count,
+                "percentage": (count / total_files) * 100
+            }
+            for file_type, count in document_types.items()
+        }
+        
+        # Calculate classification distribution with percentages
+        classification_distribution_with_percentages = {
+            category: {
+                "count": count,
+                "percentage": (count / total_files) * 100
+            }
+            for category, count in classification_distribution.items()
+        }
         
         return {
             "summary": {
-                "total_files": analysis["total_files"],
-                "total_size": analysis["total_size"],
-                "document_types": analysis["document_types"],
-                "classification_distribution": analysis["classification_distribution"]
+                "total_documents": total_files,
+                "total_size": total_size,
+                "average_file_size": total_size / total_files if total_files > 0 else 0,
+                "last_modified": analysis["last_modified"],
+                "file_type_distribution": file_type_distribution,
+                "classification_distribution": classification_distribution_with_percentages,
+                "most_common_classification": analysis["most_common_classification"],
+                "average_classification_confidence": analysis["average_classification_confidence"]
             }
         }
         
