@@ -6,8 +6,8 @@ import json
 import magic
 from datetime import datetime
 import shutil
-# from mistralai.client import MistralClient
-# from mistralai.client import ChatMessage
+from mistralai.client import MistralClient
+from mistralai.client import ChatMessage
 from mistralai import Mistral
 from dotenv import load_dotenv
 import asyncio
