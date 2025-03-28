@@ -51,7 +51,7 @@ MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 if not MISTRAL_API_KEY:
     raise ValueError("MISTRAL_API_KEY environment variable is not set")
 
-mistral_client = MistralClient(api_key=MISTRAL_API_KEY)
+mistral_client = Mistral(api_key=MISTRAL_API_KEY)
 
 # Create cache directory
 CACHE_DIR = Path("cache")
@@ -187,15 +187,16 @@ def classify_document(text: str, file_path: str) -> Dict[str, Any]:
         return cached_result
     
     try:
-        messages = [
-            ChatMessage(role="user", content=CLASSIFICATION_PROMPT.format(text=text))
-        ]
+        messages = f"CLASSIFICATION_PROMPT {text}"
         
         logger.info(f"Sending text to AI for {file_path}")
-        chat_response = mistral_client.chat.complete(
-            model="mistral-tiny",
-            messages=messages
-        )
+        chat_response = client.chat.complete(
+            model= model,
+            messages = [
+        {
+            "role": "user",
+            "content": messages,
+        }])
         
         # Extract the classification from the response
         raw_response = chat_response.choices[0].message.content.strip()
