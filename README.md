@@ -22,9 +22,9 @@ A modern web application for analyzing and managing document collections with AI
 ## Prerequisites
 
 - Python 3.8+
-- Mistral AI API key
+- Mistral AI API key (get one at https://mistral.ai/)
 
-## Installation
+## Quick Start
 
 1. Clone the repository:
 ```bash
@@ -32,21 +32,67 @@ git clone https://github.com/SijfWillem/RebelsAI_SijfS.git
 cd RebelsAI_SijfS
 ```
 
-2. Create and activate a virtual environment:
+2. Make the start script executable:
+```bash
+chmod +x start.sh
+```
+
+3. Run the application:
+```bash
+./start.sh
+```
+
+The script will:
+- Create a virtual environment if it doesn't exist
+- Install all required dependencies
+- Create necessary directories
+- Check for the .env file and create it if missing
+- Start both the backend and frontend servers
+
+4. Open your browser and navigate to `http://localhost:5001`
+
+## Manual Installation
+
+If you prefer to set up the environment manually:
+
+1. Create and activate a virtual environment:
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install dependencies:
+2. Install backend dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Set up environment variables:
+3. Install frontend dependencies:
 ```bash
-# Create .env file with your Mistral AI API key
+pip install -r frontend/requirements.txt
+```
+
+4. Create necessary directories:
+```bash
+mkdir -p backend/cache
+mkdir -p backend/uploads
+mkdir -p frontend/temp_uploads
+```
+
+5. Create a `.env` file with your Mistral AI API key:
+```bash
 echo "MISTRAL_API_KEY=your_mistral_api_key" > .env
+```
+
+6. Start the backend server:
+```bash
+cd backend
+uvicorn app:app --reload --port 8000
+```
+
+7. In a new terminal, start the frontend server:
+```bash
+cd frontend
+python app.py
 ```
 
 ## Project Structure
@@ -61,7 +107,10 @@ RebelsAI_SijfS/
 │   ├── app.py              # Flask frontend server
 │   ├── templates/          # HTML templates
 │   └── temp_uploads/       # Temporary uploads
-├── requirements.txt        # Python dependencies
+├── requirements.txt        # Backend dependencies
+├── frontend/requirements.txt # Frontend dependencies
+├── start.sh               # Start script
+├── .env                   # Environment variables
 └── README.md              # Project documentation
 ```
 
@@ -81,27 +130,9 @@ RebelsAI_SijfS/
 - `GET /api/documents`: Get document list
 - `GET /health`: Health check endpoint
 
-## Usage
-
-1. Start the backend server:
-```bash
-cd backend
-uvicorn app:app --reload --port 8000
-```
-
-2. Start the frontend server:
-```bash
-cd frontend
-python app.py
-```
-
-3. Open your browser and navigate to `http://localhost:5001`
-
-4. Upload a folder to begin analysis
-
 ## Configuration
 
-The application can be configured through environment variables:
+The application can be configured through environment variables in the `.env` file:
 
 ```env
 MISTRAL_API_KEY=your_mistral_api_key
